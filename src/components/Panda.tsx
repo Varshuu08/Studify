@@ -33,17 +33,22 @@ export function Panda({ state = "idle", size = 120 }: PandaProps) {
     >
       <svg width={size} height={size} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
         {/* Glow Aura */}
-        <circle cx="60" cy="65" r="45" fill={state === "sad" ? "#60A5FA" : "#FBBF24"} opacity="0.15" />
-        
+        <radialGradient id="pandaGlow" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stopColor={state === "sad" ? "#60A5FA" : "#FBBF24"} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={state === "sad" ? "#60A5FA" : "#FBBF24"} stopOpacity="0" />
+        </radialGradient>
+        <circle cx="60" cy="65" r="48" fill="url(#pandaGlow)" />
+
         {/* Ears */}
-        <circle cx="35" cy="35" r="14" fill="#1A1A1A" />
-        <circle cx="85" cy="35" r="14" fill="#1A1A1A" />
-        
+        <circle cx="35" cy="35" r="16" fill="#191919" />
+        <circle cx="85" cy="35" r="16" fill="#191919" />
+
         {/* Body */}
-        <ellipse cx="60" cy="85" rx="35" ry="25" fill="white" stroke="#1A1A1A" strokeWidth="2" />
-        
+        <ellipse cx="60" cy="86" rx="36" ry="26" fill="white" stroke="#1A1A1A" strokeWidth="2" />
+        <path d="M40 88 Q60 106 80 88" fill="#F3F4F6" opacity="0.65" />
+
         {/* Head */}
-        <circle cx="60" cy="55" r="32" fill="white" stroke="#1A1A1A" strokeWidth="2" />
+        <circle cx="60" cy="55" r="34" fill="white" stroke="#1A1A1A" strokeWidth="2" />
         
         {/* Eye Patches */}
         <ellipse cx="48" cy="52" rx="9" ry="11" fill="#1A1A1A" transform="rotate(-10 48 52)" />
@@ -70,8 +75,8 @@ export function Panda({ state = "idle", size = 120 }: PandaProps) {
         {/* Blush */}
         {(state === "smile" || state === "jump" || state === "dance") && (
           <>
-            <circle cx="40" cy="62" r="4" fill="#FFB3DE" opacity="0.6" />
-            <circle cx="80" cy="62" r="4" fill="#FFB3DE" opacity="0.6" />
+            <circle cx="40" cy="62" r="4.5" fill="#FF86C0" opacity="0.7" />
+            <circle cx="80" cy="62" r="4.5" fill="#FF86C0" opacity="0.7" />
           </>
         )}
 

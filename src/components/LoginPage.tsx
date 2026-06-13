@@ -18,34 +18,50 @@ export function LoginPage({ setPage }: { setPage: (p: string) => void }) {
   try {
   if (mode === "signup") {
 
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    });
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            full_name: form.name,
+          },
+        },
+      });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    if (data.user) {
-      const { error: dbError } = await supabase
-        .from("users")
-        .insert({
-          id: data.user.id,
-          email: data.user.email,
-          name: form.name,
+      if (data.user) {
+        const { error: dbError } = await supabase
+          .from("users")
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            name: form.name,
+            xp: 0,
+            completed_tasks: {},
+            activity_days: [false, false, false, false, false, false, false],
+          });
+
+        if (dbError) throw dbError;
+      }
+
+      if (!data.session && form.email && form.password) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: form.email,
+          password: form.password,
         });
 
-      if (dbError) throw dbError;
+        if (signInError) throw signInError;
+      }
+
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      });
+
+      if (error) throw error;
     }
-
-  } else {
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-    });
-
-    if (error) throw error;
-  }
 
   setPage("dashboard");
 

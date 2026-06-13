@@ -1,19 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Panda } from "./Panda";
 import { COLORS, ProgressBar } from "./Common";
 import { PetState, Roadmap, RoadmapPhase, Task } from "../types";
+import { supabase } from "../lib/supabase";
 
 export function DashboardPage() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [completedTasks, setCompletedTasks] = useState<Record<number, boolean>>({ 0: false, 1: false, 2: false });
-  const [xp, setXp] = useState(1240);
-  const [level, setLevel] = useState(12);
+  const [xp, setXp] = useState(0);
   const [petState, setPetState] = useState<PetState>("idle");
+  const [activityDays, setActivityDays] = useState<boolean[]>(new Array(7).fill(false));
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalForm, setGoalForm] = useState({ skill: "", level: "Beginner", time: "1", weeks: "8" });
   const [generatingRoadmap, setGeneratingRoadmap] = useState(false);
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [apiError, setApiError] = useState("");
+  const [name, setName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const displayName = name || userEmail.split("@")[0] || "friend";
 
   const defaultRoadmap: Roadmap = {
     title: "Python Programming Mastery",
@@ -32,22 +40,56 @@ export function DashboardPage() {
   ];
 
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const streak = [true, true, true, true, true, false, false];
+  const completedCount = Object.values(completedTasks).filter(Boolean).length;
+  const courseProgress = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
+  const level = Math.max(1, Math.floor(xp / 100) + 1);
+  const streak = activityDays;
+  const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+  let currentStreak = 0;
+  for (let i = todayIndex; i >= 0; i--) {
+    if (!activityDays[i]) break;
+    currentStreak += 1;
+  }
 
-  const handleTaskToggle = (i: number) => {
+  const saveUserStats = async (stats: { xp: number; completed_tasks: Record<number, boolean>; activity_days: boolean[] }) => {
+    if (!userId) return;
+    await supabase
+      .from("users")
+      .update({
+        xp: stats.xp,
+        completed_tasks: stats.completed_tasks,
+        activity_days: stats.activity_days,
+      })
+      .eq("id", userId);
+  };
+
+  const handleTaskToggle = async (i: number) => {
     const wasCompleted = completedTasks[i];
-    setCompletedTasks(prev => ({ ...prev, [i]: !prev[i] }));
+    const nextTasks = { ...completedTasks, [i]: !wasCompleted };
+    const nextXp = wasCompleted ? Math.max(0, xp - tasks[i].xp) : xp + tasks[i].xp;
+    const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+    const nextActivityDays = [...activityDays];
+
     if (!wasCompleted) {
-      const newXp = xp + tasks[i].xp;
-      setXp(newXp);
-      setPetState("jump");
-      if (newXp % 100 < 30) {
-        setPetState("dance");
-      }
-      setTimeout(() => setPetState("idle"), 3000);
-    } else {
-      setXp(x => x - tasks[i].xp);
+      nextActivityDays[todayIndex] = true;
+    } else if (!Object.values(nextTasks).some(Boolean)) {
+      nextActivityDays[todayIndex] = false;
     }
+
+    setCompletedTasks(nextTasks);
+    setXp(nextXp);
+    setActivityDays(nextActivityDays);
+    setPetState("jump");
+    if (nextXp % 100 < 30) {
+      setPetState("dance");
+    }
+    setTimeout(() => setPetState("idle"), 3000);
+
+    await saveUserStats({
+      xp: nextXp,
+      completed_tasks: nextTasks,
+      activity_days: nextActivityDays,
+    });
   };
 
   const generateAIRoadmap = async () => {
@@ -103,6 +145,90 @@ export function DashboardPage() {
 
   const currentRoadmap = roadmap || defaultRoadmap;
 
+  useEffect(() => {
+    const loadProfile = async () => {
+      setProfileError("");
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) {
+        setProfileError("Unable to load your profile.");
+        return;
+      }
+
+      if (!user) {
+        return;
+      }
+
+      setUserId(user.id);
+      if (user.email) {
+        setUserEmail(user.email);
+      }
+      const authName =
+        (user.user_metadata as any)?.full_name ||
+        (user.user_metadata as any)?.name ||
+        "";
+
+      const { data: profile, error: profileLoadError } = await supabase
+        .from("users")
+        .select("name, email, xp, completed_tasks, activity_days")
+        .eq("id", user.id)
+        .single();
+
+      if (profileLoadError) {
+        // If the row doesn't exist yet, still use auth metadata or email prefix.
+        if (authName) {
+          setName(authName);
+        } else if (user.email) {
+          setName(user.email.split("@")[0]);
+        }
+        return;
+      }
+
+      if (profile?.name) {
+        setName(profile.name);
+      } else if (authName) {
+        setName(authName);
+      } else if (user.email) {
+        setName(user.email.split("@")[0]);
+      }
+      if (profile?.email) setUserEmail(profile.email);
+      if (profile?.xp != null) setXp(profile.xp);
+      if (profile?.completed_tasks) setCompletedTasks(profile.completed_tasks);
+      if (Array.isArray(profile?.activity_days) && profile.activity_days.length === 7) {
+        setActivityDays(profile.activity_days.map((value: any) => !!value));
+      }
+      if (profile?.xp != null) setXp(profile.xp);
+      if (profile?.completed_tasks) setCompletedTasks(profile.completed_tasks);
+      if (Array.isArray(profile?.activity_days) && profile.activity_days.length === 7) {
+        setActivityDays(profile.activity_days);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  const saveName = async () => {
+    if (!userId) return;
+    setSavingName(true);
+    setProfileError("");
+
+    const { error } = await supabase
+      .from("users")
+      .update({ name })
+      .eq("id", userId);
+
+    if (error) {
+      setProfileError("Could not save your name. Try again.");
+    } else {
+      setEditingName(false);
+    }
+
+    setSavingName(false);
+  };
+
   const getPandaMessage = () => {
     if (petState === "jump" || petState === "dance") return "WOOO! You're amazing! 🌟";
     if (petState === "sad") return "Aww, let's get back on track together!";
@@ -148,13 +274,18 @@ export function DashboardPage() {
           <div style={{ maxWidth: 1000, margin: "0 auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 32 }}>
                 <div>
-                   <h1 style={{ fontSize: 32, fontWeight: 900, margin: "0 0 4px" }}>Hi, Aarav!</h1>
-                   <p style={{ color: COLORS.purple300, margin: 0, fontSize: 16 }}>Your goal: <span style={{ color: COLORS.yellow, fontWeight: 700 }}>{currentRoadmap.title}</span></p>
+                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                     <h1 style={{ fontSize: 32, fontWeight: 900, margin: 0 }}>Hi, {displayName}!</h1>
+                     <button onClick={() => setEditingName(prev => !prev)} style={{ background: COLORS.yellow, color: COLORS.purple900, border: "none", padding: "10px 16px", borderRadius: 14, fontWeight: 800, cursor: "pointer", fontSize: 13 }}>
+                       {editingName ? "Cancel" : "Edit name"}
+                     </button>
+                   </div>
+                   <p style={{ color: COLORS.purple300, margin: "10px 0 0", fontSize: 16 }}>Your goal: <span style={{ color: COLORS.yellow, fontWeight: 700 }}>{currentRoadmap.title}</span></p>
                 </div>
                 <div style={{ display: "flex", gap: 12 }}>
                     <div style={{ background: "rgba(124,58,237,0.15)", padding: "10px 20px", borderRadius: 14, border: `1px solid ${COLORS.purple500}44` }}>
                         <div style={{ fontSize: 11, fontWeight: 800, color: COLORS.purple300 }}>DAILY STREAK</div>
-                        <div style={{ fontSize: 18, fontWeight: 900 }}>🔥 12 Days</div>
+                        <div style={{ fontSize: 18, fontWeight: 900 }}>🔥 {currentStreak} Days</div>
                     </div>
                     <div style={{ background: "rgba(251,191,36,0.15)", padding: "10px 20px", borderRadius: 14, border: `1px solid ${COLORS.yellow}44` }}>
                         <div style={{ fontSize: 11, fontWeight: 800, color: COLORS.yellow }}>XP POINTS</div>
@@ -182,9 +313,9 @@ export function DashboardPage() {
                 <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 32, border: "1px solid rgba(255,255,255,0.06)", padding: 32 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                         <div style={{ fontWeight: 800, color: COLORS.purple200 }}>Course Progress</div>
-                        <div style={{ fontWeight: 900, color: COLORS.gold }}>42%</div>
+                        <div style={{ fontWeight: 900, color: COLORS.gold }}>{courseProgress}%</div>
                     </div>
-                    <ProgressBar percent={42} color={COLORS.gold} />
+                    <ProgressBar percent={courseProgress} color={COLORS.gold} />
                     <div style={{ marginTop: 32 }}>
                         <div style={{ color: COLORS.purple400, fontSize: 12, fontWeight: 800, textTransform: "uppercase", marginBottom: 16 }}>This Week</div>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -198,6 +329,29 @@ export function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            {editingName && (
+              <div style={{ marginBottom: 24, maxWidth: 560, padding: 24, background: "rgba(255,255,255,0.05)", borderRadius: 24, border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, gap: 12, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: COLORS.purple200, marginBottom: 6 }}>Change your display name</div>
+                    <div style={{ fontSize: 13, color: COLORS.purple400 }}>This updates the name shown across your dashboard.</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Enter your name"
+                    style={{ flex: 1, minWidth: 220, padding: "14px 18px", borderRadius: 14, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "white", fontSize: 15, fontFamily: "'Nunito', sans-serif" }}
+                  />
+                  <button onClick={saveName} disabled={savingName || !name.trim()} style={{ background: COLORS.yellow, color: COLORS.purple900, border: "none", padding: "14px 22px", borderRadius: 14, fontSize: 15, fontWeight: 900, cursor: savingName ? "default" : "pointer" }}>
+                    {savingName ? "Saving..." : "Save name"}
+                  </button>
+                </div>
+                {profileError && <div style={{ marginTop: 12, color: "#F87171", fontSize: 13, fontWeight: 700 }}>{profileError}</div>}
+              </div>
+            )}
 
             {/* Daily Tasks Section */}
             <div style={{ marginTop: 24 }}>
