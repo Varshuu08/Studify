@@ -1,0 +1,6 @@
+{
+  "name": "EduBuddy AI",
+  "description": "A gamified AI-powered learning companion that builds roadmaps and tracks your progress with a virtual pet.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
