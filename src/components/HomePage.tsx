@@ -54,7 +54,7 @@ export function HomePage({ setPage }: { setPage: (p: string) => void }) {
             <button onClick={() => setPage("login")} style={{ background: COLORS.purple500, border: "none", color: "white", padding: "16px 32px", borderRadius: 14, fontSize: 17, fontWeight: 800, cursor: "pointer", fontFamily: "'Nunito', sans-serif", boxShadow: `0 4px 15px rgba(124,58,237,0.4)` }}>
               Start Learning Free
             </button>
-            <button onClick={() => setPage("dashboard")} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(196,181,253,0.3)", color: COLORS.purple100, padding: "16px 28px", borderRadius: 14, fontSize: 17, fontWeight: 700, cursor: "pointer", fontFamily: "'Nunito', sans-serif" }}>
+            <button onClick={() => setPage("demo")} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(196,181,253,0.3)", color: COLORS.purple100, padding: "16px 28px", borderRadius: 14, fontSize: 17, fontWeight: 700, cursor: "pointer", fontFamily: "'Nunito', sans-serif" }}>
               Watch Demo
             </button>
           </div>

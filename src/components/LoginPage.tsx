@@ -6,62 +6,90 @@ import { supabase } from "../lib/supabase";
 
 export function LoginPage({ setPage }: { setPage: (p: string) => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", username: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [petState, setPetState] = useState<PetState>("idle");
 
   const handleSubmit = async () => {
-  if (!form.email || !form.password) return;
+  const loginInput = form.username || form.email;
+  
+  if (!loginInput || !form.password) return;
 
   setLoading(true);
 
   try {
   if (mode === "signup") {
-
-      const { data, error } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: {
-          data: {
-            full_name: form.name,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        const { error: dbError } = await supabase
-          .from("users")
-          .insert({
-            id: data.user.id,
-            email: data.user.email,
-            name: form.name,
-            xp: 0,
-            completed_tasks: {},
-            activity_days: [false, false, false, false, false, false, false],
-          });
-
-        if (dbError) throw dbError;
-      }
-
-      if (!data.session && form.email && form.password) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: form.email,
-          password: form.password,
-        });
-
-        if (signInError) throw signInError;
-      }
-
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
-
-      if (error) throw error;
+    if (!form.email || !form.username) {
+      alert("Email and username are required for signup");
+      setLoading(false);
+      return;
     }
+
+    // Step 1: Create auth account
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+  email: form.email,
+  password: form.password,
+  options: {
+    data: {
+      name: form.name,
+      username: form.username
+    }
+  }
+})
+
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("User creation failed");
+
+    // Step 2: Create user profile in public.users table with username
+    const { error: profileError } = await supabase
+      .from('users')
+      .insert({
+        id: authData.user.id,
+        username: form.username,
+        email: form.email,
+        name: form.name
+      });
+
+    if (profileError) throw profileError;
+
+    // Step 3: Auto-login after signup
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
+
+    if (signInError) throw signInError;
+
+  } else {
+    // LOGIN MODE
+    const isEmail = loginInput.includes('@');
+    
+    if (isEmail) {
+      // Direct email login
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginInput,
+        password: form.password,
+      });
+      if (error) throw error;
+    } else {
+      // Username login: fetch email from users table first
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('username', loginInput)
+        .single();
+      if (userError || !userData) {
+        throw new Error('Invalid username or password');
+      }
+
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: userData.email,
+        password: form.password,
+      });
+
+      if (loginError) throw loginError;
+    }
+  }
 
   setPage("dashboard");
 
@@ -76,8 +104,8 @@ export function LoginPage({ setPage }: { setPage: (p: string) => void }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, maxWidth: 940, width: "100%", alignItems: "center" }}>
         {/* Left: welcome */}
         <div style={{ textAlign: "center" }}>
-          <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: "50%", width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", border: `3px dashed ${COLORS.yellow}44` }}>
-            <Panda state={petState} size={180} />
+          <div style={{ background: "rgba(0,0,0,0.2)", borderRadius: "50%", width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+            <Panda state={petState} size={210} />
           </div>
           <h2 style={{ fontSize: 32, fontWeight: 900, color: "white", marginBottom: 12 }}>
             {mode === "login" ? "Welcome back! 👋" : "Join the pride! 🐼"}
@@ -112,10 +140,30 @@ export function LoginPage({ setPage }: { setPage: (p: string) => void }) {
                 </div>
             )}
 
-            <div>
-                <label style={{ fontSize: 14, color: COLORS.purple300, display: "block", marginBottom: 8, fontWeight: 700 }}>Email Address</label>
-                <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="alex@example.com" type="email" style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 15, fontFamily: "'Nunito', sans-serif", outline: "none", boxSizing: "border-box" }} />
-            </div>
+            {mode === "login" ? (
+              <div>
+                <label style={{ fontSize: 14, color: COLORS.purple300, display: "block", marginBottom: 8, fontWeight: 700 }}>Username or Email</label>
+                <input value={form.username || form.email} onChange={e => {
+                  const val = e.target.value;
+                  if (val.includes('@')) {
+                    setForm(f => ({ ...f, email: val, username: "" }));
+                  } else {
+                    setForm(f => ({ ...f, username: val, email: "" }));
+                  }
+                }} placeholder="alex or alex@example.com" style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 15, fontFamily: "'Nunito', sans-serif", outline: "none", boxSizing: "border-box" }} />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label style={{ fontSize: 14, color: COLORS.purple300, display: "block", marginBottom: 8, fontWeight: 700 }}>Username</label>
+                  <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="alex_chen" style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 15, fontFamily: "'Nunito', sans-serif", outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 14, color: COLORS.purple300, display: "block", marginBottom: 8, fontWeight: 700 }}>Email Address</label>
+                  <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="alex@example.com" type="email" style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 15, fontFamily: "'Nunito', sans-serif", outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </>
+            )}
 
             <div>
                 <label style={{ fontSize: 14, color: COLORS.purple300, display: "block", marginBottom: 8, fontWeight: 700 }}>Password</label>

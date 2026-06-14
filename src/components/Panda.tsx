@@ -7,6 +7,27 @@ interface PandaProps {
 }
 
 export function Panda({ state = "idle", size = 120 }: PandaProps) {
+  // Map states to panda image names
+  const getPandaImage = () => {
+    const baseUrl = '/assets/pandas';
+    switch (state) {
+      case "jump":
+        return `${baseUrl}/happy.jpg`;
+      case "dance":
+        return `${baseUrl}/music.jpg`;
+      case "sleep":
+        return `${baseUrl}/meditate.jpg`;
+      case "sad":
+        return `${baseUrl}/confused.jpg`;
+      case "learn":
+      case "learning":
+        return `${baseUrl}/laptop.jpg`;
+      case "idle":
+      default:
+        return `${baseUrl}/smile.jpg`;
+    }
+  };
+
   const getVariants = () => {
     switch (state) {
       case "jump":
@@ -29,84 +50,27 @@ export function Panda({ state = "idle", size = 120 }: PandaProps) {
   return (
     <motion.div 
       animate={getVariants()}
-      style={{ width: size, height: size, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}
+      style={{ 
+        width: size, 
+        height: size, 
+        position: "relative", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        borderRadius: "50%",
+        overflow: "hidden"
+      }}
     >
-      <svg width={size} height={size} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Glow Aura */}
-        <radialGradient id="pandaGlow" cx="50%" cy="50%" r="60%">
-          <stop offset="0%" stopColor={state === "sad" ? "#60A5FA" : "#FBBF24"} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={state === "sad" ? "#60A5FA" : "#FBBF24"} stopOpacity="0" />
-        </radialGradient>
-        <circle cx="60" cy="65" r="48" fill="url(#pandaGlow)" />
-
-        {/* Ears */}
-        <circle cx="35" cy="35" r="16" fill="#191919" />
-        <circle cx="85" cy="35" r="16" fill="#191919" />
-
-        {/* Body */}
-        <ellipse cx="60" cy="86" rx="36" ry="26" fill="white" stroke="#1A1A1A" strokeWidth="2" />
-        <path d="M40 88 Q60 106 80 88" fill="#F3F4F6" opacity="0.65" />
-
-        {/* Head */}
-        <circle cx="60" cy="55" r="34" fill="white" stroke="#1A1A1A" strokeWidth="2" />
-        
-        {/* Eye Patches */}
-        <ellipse cx="48" cy="52" rx="9" ry="11" fill="#1A1A1A" transform="rotate(-10 48 52)" />
-        <ellipse cx="72" cy="52" rx="9" ry="11" fill="#1A1A1A" transform="rotate(10 72 52)" />
-        
-        {/* Eyes */}
-        {state === "sleep" ? (
-          <>
-            <path d="M44 52 Q48 48 52 52" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M68 52 Q72 48 76 52" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-          </>
-        ) : state === "sad" ? (
-          <>
-            <path d="M44 52 Q48 56 52 52" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M68 52 Q72 56 76 52" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-          </>
-        ) : (
-          <>
-            <circle cx="48" cy="52" r="3" fill="white" />
-            <circle cx="72" cy="52" r="3" fill="white" />
-          </>
-        )}
-
-        {/* Blush */}
-        {(state === "smile" || state === "jump" || state === "dance") && (
-          <>
-            <circle cx="40" cy="62" r="4.5" fill="#FF86C0" opacity="0.7" />
-            <circle cx="80" cy="62" r="4.5" fill="#FF86C0" opacity="0.7" />
-          </>
-        )}
-
-        {/* Nose */}
-        <path d="M57 60 Q60 63 63 60" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" />
-        
-        {/* Mouth */}
-        {state === "smile" || state === "jump" || state === "dance" ? (
-          <path d="M54 66 Q60 72 66 66" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" fill="none" />
-        ) : state === "sad" ? (
-          <path d="M54 68 Q60 62 66 68" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" fill="none" />
-        ) : (
-          <path d="M56 66 Q60 68 64 66" stroke="#1A1A1A" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-        )}
-
-        {/* Decorations */}
-        {state === "sleep" && (
-          <motion.text 
-            x="85" y="30" fontSize="10" fill="#7C3AED" fontWeight="bold"
-            animate={{ opacity: [0, 1, 0], y: [0, -10], x: [0, 5] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-          >Zzz</motion.text>
-        )}
-        {(state === "jump" || state === "dance") && (
-          <>
-            <motion.text x="15" y="25" fontSize="12" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity }}>✨</motion.text>
-            <motion.text x="95" y="20" fontSize="12" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, delay: 0.2 }}>🌟</motion.text>
-          </>
-        )}
-      </svg>
+      <img 
+        src={getPandaImage()} 
+        alt={`Panda ${state}`}
+        style={{ 
+          width: "100%", 
+          height: "100%", 
+          objectFit: 'cover',
+          borderRadius: "50%"
+        }}
+      />
     </motion.div>
   );
 }
